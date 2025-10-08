@@ -19,16 +19,15 @@ const ShowSecret = () => {
 
     const fetchSecrets = async () => {
         try {
-            const response = await fetch('http://localhost:5000/showsecret', {
-                method: 'POST',
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/showsecret`, {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ 
-                    emailid: email, 
+                body: JSON.stringify({
+                    emailid: email,
                 })
             });
-            if (response.status===200) {
+            if (response.status === 200) {
                 const data = await response.json();
                 // Backend returns { secrets: [...] }
                 const secretsArray = data.secrets || [];
@@ -56,7 +55,7 @@ const ShowSecret = () => {
 
     const handleCopy = async (label) => {
         try {
-            const response = await fetch('http://localhost:5000/getsecret', {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/getsecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -85,7 +84,7 @@ const ShowSecret = () => {
         if (!confirm(`Are you sure you want to delete "${label}"?`)) return;
 
         try {
-            const response = await fetch('http://localhost:5000/removesecret', {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/removesecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -105,7 +104,7 @@ const ShowSecret = () => {
         }
     };
 
-    const filteredSecrets = Array.isArray(secrets) 
+    const filteredSecrets = Array.isArray(secrets)
         ? secrets.filter(secret =>
             secret.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             secret.username?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -149,7 +148,7 @@ const ShowSecret = () => {
             {/* Password Count */}
             <div className="mb-4">
                 <p className="text-purple-300 text-sm">
-                    {filteredSecrets.length} {filteredSecrets.length === 1 ? 'password' : 'passwords'} 
+                    {filteredSecrets.length} {filteredSecrets.length === 1 ? 'password' : 'passwords'}
                     {searchQuery && ` found for "${searchQuery}"`}
                 </p>
             </div>
@@ -183,7 +182,7 @@ const ShowSecret = () => {
             {/* Password Cards */}
             <div className="grid gap-4">
                 {filteredSecrets.map((secret) => (
-                    <div 
+                    <div
                         key={secret.id}
                         className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all group"
                     >
@@ -196,7 +195,7 @@ const ShowSecret = () => {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                         </svg>
                                     </div>
-                                    
+
                                     {/* Label & Username */}
                                     <div className="flex-1 min-w-0">
                                         <h3 className="text-white font-semibold text-lg truncate">{secret.label}</h3>
@@ -208,9 +207,9 @@ const ShowSecret = () => {
 
                                 {/* URL */}
                                 {secret.url && (
-                                    <a 
-                                        href={secret.url} 
-                                        target="_blank" 
+                                    <a
+                                        href={secret.url}
+                                        target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-1 mb-2 w-fit"
                                     >

@@ -11,27 +11,27 @@ const Login = () => {
     const { setMasterPassword } = usePassword();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    
+
     const onSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
-        
+
         const email = e.target[0].value;
         const password = e.target[1].value;
-        
+
         try {
-            const response = await fetch('http://localhost:5000/login', {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/login`, {
                 method: 'POST', // Fixed: Changed from GET to POST
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({emailid: email, password: password})
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emailid: email, password: password })
             });
-            
+
             const data = await response.json();
             console.log(data);
-            
-            if(response.status === 200){
-                dispatch(setUser({email: email}));
+
+            if (response.status === 200) {
+                dispatch(setUser({ email: email }));
                 setMasterPassword(password);
                 router.push('/Home');
             } else {
@@ -44,12 +44,12 @@ const Login = () => {
             setLoading(false);
         }
     }
-    
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
             <div className="max-w-md w-full">
                 {/* Back Button */}
-                <button 
+                <button
                     onClick={() => router.push('/')}
                     className="cursor-pointer text-purple-300 hover:text-white mb-8 flex items-center gap-2 transition-colors"
                 >
@@ -95,8 +95,8 @@ const Login = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                                     </svg>
                                 </div>
-                                <input 
-                                    type="email" 
+                                <input
+                                    type="email"
                                     placeholder="you@example.com"
                                     required
                                     className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
@@ -115,8 +115,8 @@ const Login = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                     </svg>
                                 </div>
-                                <input 
-                                    type="password" 
+                                <input
+                                    type="password"
                                     placeholder="Enter your master password"
                                     required
                                     className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
@@ -125,7 +125,7 @@ const Login = () => {
                         </div>
 
                         {/* Submit Button */}
-                        <button 
+                        <button
                             type="submit"
                             disabled={loading}
                             className="cursor-pointer w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-purple-500/50 transition-all duration-200 hover:scale-105 hover:shadow-purple-500/70 flex items-center justify-center gap-2"
