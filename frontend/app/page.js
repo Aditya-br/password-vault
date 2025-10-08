@@ -4,7 +4,16 @@ import { useRouter } from "next/navigation";
 
 export default function Home() {
   const router = useRouter();
-  
+  const testBackend = async () => {
+  try {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/`);
+    const data = await response.text();
+    console.log("Backend test response:", data);
+  } catch (err) {
+    console.error("Backend connection failed:", err);
+  }
+};
+testBackend();
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
