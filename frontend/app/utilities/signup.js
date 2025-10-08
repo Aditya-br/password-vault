@@ -32,7 +32,7 @@ const Signup = () => {
         const password = e.target[1].value;
 
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/signup`, {
+            const response = await fetch('https://password-vault-ylej.onrender.com/signup', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ emailid: email, password }),
