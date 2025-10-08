@@ -28,7 +28,7 @@ const PasswordGenerate = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch('http://localhost:5000/generatepassword', {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/generatepassword`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
