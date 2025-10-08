@@ -19,7 +19,7 @@ const ShowSecret = () => {
 
     const fetchSecrets = async () => {
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/showsecret`, {
+            const response = await fetch(`https://password-vault-ylej.onrender.com/showsecret`, {
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -55,7 +55,7 @@ const ShowSecret = () => {
 
     const handleCopy = async (label) => {
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/getsecret`, {
+            const response = await fetch(`https://password-vault-ylej.onrender.com/getsecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ const ShowSecret = () => {
         if (!confirm(`Are you sure you want to delete "${label}"?`)) return;
 
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/removesecret`, {
+            const response = await fetch(`https://password-vault-ylej.onrender.com/removesecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

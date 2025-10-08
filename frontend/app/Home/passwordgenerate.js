@@ -28,7 +28,7 @@ const PasswordGenerate = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/generatepassword`, {
+            const response = await fetch(`https://password-vault-ylej.onrender.com/generatepassword`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -37,9 +37,9 @@ const PasswordGenerate = ({ onClose }) => {
                     emailid: email,
                     masterPassword: masterPassword,
                     label: label,
-                    username: username,        
-                    url: url,                  
-                    note: note,                
+                    username: username,
+                    url: url,
+                    note: note,
                     length: parseInt(length),
                     useUppercase: useUppercase,
                     useLowercase: useLowercase,

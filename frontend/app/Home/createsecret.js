@@ -19,20 +19,20 @@ const CreateSecret = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/createsecret`, {
+            const response = await fetch(`https://password-vault-ylej.onrender.com/createsecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${masterPassword}`
                 },
-                body: JSON.stringify({ 
-                    emailid: email, 
-                    label: label, 
-                    password: password, 
-                    masterPassword: masterPassword, 
-                    note: note, 
-                    username: username, 
-                    url: url 
+                body: JSON.stringify({
+                    emailid: email,
+                    label: label,
+                    password: password,
+                    masterPassword: masterPassword,
+                    note: note,
+                    username: username,
+                    url: url
                 })
             });
             if (response.status === 201) {
@@ -86,7 +86,7 @@ const CreateSecret = ({ onClose }) => {
                 e.preventDefault();
                 handleCreateSecret(label, password);
             }} className="space-y-5">
-                
+
                 {/* Label */}
                 <div>
                     <label className="block text-purple-200 text-sm font-medium mb-2">
