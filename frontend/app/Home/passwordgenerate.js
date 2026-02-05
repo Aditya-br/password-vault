@@ -28,7 +28,7 @@ const PasswordGenerate = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`https://password-vault-ylej.onrender.com/generatepassword`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}generatepassword`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

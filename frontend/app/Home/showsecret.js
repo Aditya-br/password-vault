@@ -19,7 +19,7 @@ const ShowSecret = () => {
 
     const fetchSecrets = async () => {
         try {
-            const response = await fetch(`https://password-vault-ylej.onrender.com/showsecret`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}showsecret`, {
                 method:'POST',
                 headers: {
                     'Content-Type': 'application/json',

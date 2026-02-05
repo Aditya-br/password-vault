@@ -21,7 +21,7 @@ const Login = () => {
         const password = e.target[1].value;
 
         try {
-            const response = await fetch(`https://password-vault-ylej.onrender.com/login`, {
+            const response = await fetch(`${process.env.BACKEND_URL}/login`, {
                 method: 'POST', // Fixed: Changed from GET to POST
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ emailid: email, password: password })

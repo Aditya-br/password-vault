@@ -19,7 +19,7 @@ const CreateSecret = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`https://password-vault-ylej.onrender.com/createsecret`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}createsecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
