@@ -161,7 +161,6 @@ app.post('/createsecret', async (req, res) => {
 
 app.post('/signup', (req, res) => {
   const { emailid, password } = req.body
-  console.log("Email:", emailid, " Password:", password);
   const loginsalt = crypto.getRandomValues(new Uint8Array(16));
   const encsalt = crypto.getRandomValues(new Uint8Array(16));
   LoginDetails.findOne({ emailid }).then(user => {
