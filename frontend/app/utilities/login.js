@@ -1,11 +1,11 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { setUser } from "../redux/Session";
 import { useRouter } from "next/navigation";
 import { usePassword } from "../Context/passwordContext";
 import { createLoginProof } from "./auth";
-import { getApiUrl } from "./apiUrl";
+import { fetchApi, getApiUrl } from "./apiUrl";
 import { generateKey } from "./generatekey";
 import AuthShell, {
   Field,
@@ -35,9 +35,16 @@ async function readApiResponse(response, endpoint) {
 const Login = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const { setEncryptionKey, setSessionToken } = usePassword();
+  const { encryptionKey, sessionToken, setEncryptionKey, setSessionToken } = usePassword();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [redirectToHome, setRedirectToHome] = useState(false);
+
+  useEffect(() => {
+    if (redirectToHome && encryptionKey && sessionToken) {
+      router.replace("/Home");
+    }
+  }, [encryptionKey, redirectToHome, router, sessionToken]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -50,11 +57,11 @@ const Login = () => {
 
     try {
       const apiUrl = getApiUrl();
-      const challengeResponse = await fetch(`${apiUrl}auth-challenge`, {
+      const challengeResponse = await fetchApi("auth-challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailid: email }),
-      });
+      }, "start login");
       const challenge = await readApiResponse(challengeResponse, "/auth-challenge");
       if (!challengeResponse.ok) {
         setError(challenge.error || "Login failed. Please check your credentials.");
@@ -65,7 +72,7 @@ const Login = () => {
         createLoginProof(password, challenge.authSalt, challenge.nonce, challenge.authIterations),
         generateKey(password, new Uint8Array(challenge.encSalt), challenge.encIterations),
       ]);
-      const response = await fetch(`${apiUrl}login`, {
+      const response = await fetchApi("login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -73,15 +80,19 @@ const Login = () => {
           challengeId: challenge.challengeId,
           proof,
         }),
-      });
+      }, "complete login");
 
       const data = await readApiResponse(response, "/login");
 
       if (response.status === 200) {
+        if (typeof data.token !== "string" || !data.token) {
+          setError("The backend is outdated and did not start a session. Deploy the latest backend, then try again.");
+          return;
+        }
         dispatch(setUser({ email: email }));
         setEncryptionKey(encryptionKey);
         setSessionToken(data.token);
-        router.push("/Home");
+        setRedirectToHome(true);
       } else {
         setError(data.error || "Login failed. Please check your credentials.");
       }

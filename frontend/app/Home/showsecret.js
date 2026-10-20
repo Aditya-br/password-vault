@@ -3,17 +3,80 @@ import React, { useEffect, useState } from 'react'
 import { decryptText } from '../utilities/decoder'
 import { usePassword } from '../Context/passwordContext'
 import { getApiUrl } from '../utilities/apiUrl'
+import { Icon, ICONS, ErrorNotice, btnPrimary } from './vaultui'
 
-const ShowSecret = ({ refreshKey = 0 }) => {
+const hostOf = (url) => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+        return url;
+    }
+};
+
+const websiteUrl = (url) => {
+    try {
+        const parsedUrl = new URL(url);
+        return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
+            ? parsedUrl
+            : null;
+    } catch {
+        return null;
+    }
+};
+
+const SecretLogo = ({ label, url }) => {
+    const [hasLogo, setHasLogo] = useState(Boolean(url));
+    const [useSiteFavicon, setUseSiteFavicon] = useState(false);
+    const parsedUrl = websiteUrl(url);
+    const logoUrl = parsedUrl
+        ? useSiteFavicon
+            ? `${parsedUrl.origin}/favicon.ico`
+            : `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(parsedUrl.origin)}&sz=128`
+        : null;
+
+    useEffect(() => {
+        setHasLogo(Boolean(parsedUrl));
+        setUseSiteFavicon(false);
+    }, [url]);
+
+    return (
+        <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#0E1726] font-[family-name:var(--font-display)] text-lg font-semibold text-[#D4A24C]">
+            {hasLogo && logoUrl && (
+                <img
+                    src={logoUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full bg-white object-contain p-1"
+                    onError={() => {
+                        if (!useSiteFavicon) setUseSiteFavicon(true);
+                        else setHasLogo(false);
+                    }}
+                />
+            )}
+            {(label || '?').charAt(0).toUpperCase()}
+        </span>
+    );
+};
+
+const ShowSecret = ({ refreshKey = 0, onAdd }) => {
     const [secrets, setSecrets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [copiedLabel, setCopiedLabel] = useState(null);
+    const [confirmLabel, setConfirmLabel] = useState(null);
+    const [notice, setNotice] = useState("");
     const { encryptionKey, sessionToken } = usePassword();
 
     useEffect(() => {
         fetchSecrets();
     }, [refreshKey]);
+
+    // Errors fade out on their own.
+    useEffect(() => {
+        if (!notice) return;
+        const t = setTimeout(() => setNotice(""), 4000);
+        return () => clearTimeout(t);
+    }, [notice]);
 
     const fetchSecrets = async () => {
         try {
@@ -69,17 +132,15 @@ const ShowSecret = ({ refreshKey = 0 }) => {
                 setTimeout(() => setCopiedLabel(null), 2000);
             } else {
                 console.error('Error copying secret:', response.statusText);
-                alert('Failed to copy password');
+                setNotice('Couldn’t copy that password. Try again.');
             }
         } catch (error) {
             console.error('Error copying secret:', error);
-            alert('Error copying password');
+            setNotice('Couldn’t copy that password. Try again.');
         }
     };
 
     const handleDelete = async (label) => {
-        if (!confirm(`Are you sure you want to delete "${label}"?`)) return;
-
         try {
             const response = await fetch(`${getApiUrl()}removesecret`, {
                 method: 'POST',
@@ -94,11 +155,13 @@ const ShowSecret = ({ refreshKey = 0 }) => {
                 setSecrets(secrets.filter(secret => secret.label !== label));
             } else {
                 console.error('Error deleting secret:', response.statusText);
-                alert('Failed to delete password');
+                setNotice('Couldn’t delete that password. Try again.');
             }
         } catch (error) {
             console.error('Error deleting secret:', error);
-            alert('Error deleting password');
+            setNotice('Couldn’t delete that password. Try again.');
+        } finally {
+            setConfirmLabel(null);
         }
     };
 
@@ -111,13 +174,20 @@ const ShowSecret = ({ refreshKey = 0 }) => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <div className="text-center">
-                    <svg className="animate-spin h-12 w-12 text-purple-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="text-purple-300">Loading your vault...</p>
+            <div aria-busy="true" aria-label="Loading your vault">
+                <div className="mb-3 h-8 w-48 animate-pulse rounded-lg bg-[#0E1726]/10 motion-reduce:animate-none" />
+                <div className="mb-8 h-4 w-24 animate-pulse rounded bg-[#0E1726]/10 motion-reduce:animate-none" />
+                <div className="mb-6 h-12 animate-pulse rounded-xl bg-[#0E1726]/10 motion-reduce:animate-none" />
+                <div className="divide-y divide-[#0E1726]/10 overflow-hidden rounded-2xl bg-white ring-1 ring-[#0E1726]/10">
+                    {[0, 1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-4 px-5 py-4">
+                            <div className="h-11 w-11 animate-pulse rounded-xl bg-[#0E1726]/10 motion-reduce:animate-none" />
+                            <div className="flex-1 space-y-2">
+                                <div className="h-4 w-1/3 animate-pulse rounded bg-[#0E1726]/10 motion-reduce:animate-none" />
+                                <div className="h-3 w-1/2 animate-pulse rounded bg-[#0E1726]/10 motion-reduce:animate-none" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         );
@@ -125,136 +195,147 @@ const ShowSecret = ({ refreshKey = 0 }) => {
 
     return (
         <div>
-            {/* Search Bar */}
+            {/* Heading + count */}
             <div className="mb-6">
-                <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Search passwords..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    />
-                </div>
+                <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-[-0.02em]">
+                    Your passwords
+                </h2>
+                <p className="mt-1 text-sm text-[#5B6577]" aria-live="polite">
+                    {filteredSecrets.length} {filteredSecrets.length === 1 ? 'password' : 'passwords'}
+                    {searchQuery && ` found for “${searchQuery}”`}
+                </p>
             </div>
 
-            {/* Password Count */}
-            <div className="mb-4">
-                <p className="text-purple-300 text-sm">
-                    {filteredSecrets.length} {filteredSecrets.length === 1 ? 'password' : 'passwords'}
-                    {searchQuery && ` found for "${searchQuery}"`}
-                </p>
+            <ErrorNotice message={notice} className="mb-4" />
+
+            {/* Search Bar */}
+            <div className="relative mb-6">
+                <span className="pointer-events-none absolute inset-y-0 left-0 grid w-12 place-items-center text-[#5B6577]">
+                    <Icon d={ICONS.search} className="h-5 w-5" />
+                </span>
+                <input
+                    type="search"
+                    aria-label="Search passwords"
+                    placeholder="Search by site or username"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-xl border border-[#0E1726]/15 bg-white py-3 pl-12 pr-4 text-[#0E1726] outline-none placeholder:text-[#8A93A3] transition focus:border-[#0E1726] focus:ring-4 focus:ring-[#0E1726]/10"
+                />
             </div>
 
             {/* Empty State */}
             {filteredSecrets.length === 0 && !searchQuery && (
-                <div className="text-center py-20">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-purple-600/20 rounded-2xl mb-6">
-                        <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-xl font-semibold text-white mb-2">No passwords yet</h3>
-                    <p className="text-purple-300 mb-6">Start securing your passwords by creating your first entry</p>
+                <div className="rounded-2xl border border-dashed border-[#0E1726]/20 px-6 py-16 text-center">
+                    <span className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[#0E1726] text-[#D4A24C]">
+                        <Icon d={ICONS.lock} className="h-7 w-7" />
+                    </span>
+                    <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold">No passwords yet</h3>
+                    <p className="mx-auto mb-6 mt-2 max-w-xs text-[#5B6577]">
+                        Save your first login and it will show up here.
+                    </p>
+                    {onAdd && (
+                        <button onClick={onAdd} className={btnPrimary}>
+                            <Icon d={ICONS.plus} className="h-4 w-4" />
+                            Add password
+                        </button>
+                    )}
                 </div>
             )}
 
             {/* No Search Results */}
             {filteredSecrets.length === 0 && searchQuery && (
-                <div className="text-center py-20">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-purple-600/20 rounded-2xl mb-6">
-                        <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-xl font-semibold text-white mb-2">No results found</h3>
-                    <p className="text-purple-300">Try searching with different keywords</p>
+                <div className="px-6 py-16 text-center">
+                    <span className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[#0E1726]/10 text-[#0E1726]">
+                        <Icon d={ICONS.search} className="h-7 w-7" />
+                    </span>
+                    <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold">No results</h3>
+                    <p className="mt-2 text-[#5B6577]">Check the spelling or try a different word.</p>
                 </div>
             )}
 
-            {/* Password Cards */}
-            <div className="grid gap-4">
-                {filteredSecrets.map((secret) => (
-                    <div
-                        key={secret.id}
-                        className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all group"
-                    >
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-3 mb-3">
-                                    {/* Icon */}
-                                    <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                        </svg>
+            {/* Password list */}
+            {filteredSecrets.length > 0 && (
+                <ul className="divide-y divide-[#0E1726]/10 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#0E1726]/10">
+                    {filteredSecrets.map((secret) => {
+                        const confirming = confirmLabel === secret.label;
+                        const copied = copiedLabel === secret.label;
+                        return (
+                            <li key={secret.id} className="px-5 py-4">
+                                <div className="flex items-center gap-4">
+                                    {/* Avatar */}
+                                    <SecretLogo label={secret.label} url={secret.url} />
+
+                                    {/* Details */}
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="truncate font-medium">{secret.label}</h3>
+                                        {secret.username && (
+                                            <p className="truncate text-sm text-[#5B6577]">{secret.username}</p>
+                                        )}
+                                        {websiteUrl(secret.url) && (
+                                            <a
+                                                href={websiteUrl(secret.url).href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mt-0.5 inline-flex max-w-full items-center gap-1 text-sm text-[#0E1726] underline decoration-[#0E1726]/30 underline-offset-4 hover:decoration-[#0E1726] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0E1726]"
+                                            >
+                                                <span className="truncate">{hostOf(secret.url)}</span>
+                                                <Icon d={ICONS.external} className="h-3.5 w-3.5 shrink-0" />
+                                            </a>
+                                        )}
+                                        {secret.note && (
+                                            <p className="mt-1.5 line-clamp-2 text-sm text-[#5B6577]">{secret.note}</p>
+                                        )}
                                     </div>
 
-                                    {/* Label & Username */}
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-white font-semibold text-lg truncate">{secret.label}</h3>
-                                        {secret.username && (
-                                            <p className="text-purple-300 text-sm truncate">{secret.username}</p>
-                                        )}
+                                    {/* Actions */}
+                                    <div className="flex shrink-0 gap-2">
+                                        <button
+                                            onClick={() => handleCopy(secret.label)}
+                                            aria-label={`Copy ${secret.label} password`}
+                                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0E1726] ${
+                                                copied
+                                                    ? 'bg-[#0E1726] text-white'
+                                                    : 'bg-[#0E1726]/5 text-[#0E1726] hover:bg-[#0E1726]/10'
+                                            }`}
+                                        >
+                                            <Icon d={copied ? ICONS.check : ICONS.copy} className="h-4 w-4" />
+                                            <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setConfirmLabel(secret.label)}
+                                            aria-label={`Delete ${secret.label}`}
+                                            className="rounded-lg p-2 text-[#5B6577] transition-colors hover:bg-red-50 hover:text-red-600 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600"
+                                        >
+                                            <Icon d={ICONS.trash} className="h-5 w-5" />
+                                        </button>
                                     </div>
                                 </div>
 
-                                {/* URL */}
-                                {secret.url && (
-                                    <a
-                                        href={secret.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-1 mb-2 w-fit"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                        </svg>
-                                        Visit site
-                                    </a>
+                                {/* Inline delete confirmation */}
+                                {confirming && (
+                                    <div role="alertdialog" aria-label={`Delete ${secret.label}?`} className="mt-4 flex flex-col gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+                                        <span>Delete “{secret.label}”? This can’t be undone.</span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setConfirmLabel(null)}
+                                                className="rounded-lg px-3 py-1.5 font-medium hover:bg-red-100 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(secret.label)}
+                                                className="rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
-
-                                {/* Note */}
-                                {secret.note && (
-                                    <p className="text-purple-300 text-sm mt-2 line-clamp-2">{secret.note}</p>
-                                )}
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-2 ml-4">
-                                <button
-                                    onClick={() => handleCopy(secret.label)}
-                                    className="p-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 hover:text-purple-300 rounded-lg transition-all relative"
-                                    title="Copy password"
-                                >
-                                    {copiedLabel === secret.label ? (
-                                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    ) : (
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                        </svg>
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(secret.label)}
-                                    className="p-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded-lg transition-all"
-                                    title="Delete password"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
         </div>
     );
 };

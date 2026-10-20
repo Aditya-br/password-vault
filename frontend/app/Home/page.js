@@ -6,6 +6,30 @@ import { usePassword } from '../Context/passwordContext'
 import CreateSecret from './createsecret'
 import PasswordGenerate from './passwordgenerate'
 import ShowSecret from './showsecret'
+import {
+  displayFont,
+  bodyFont,
+  monoFont,
+  Icon,
+  ICONS,
+  Modal,
+  ModalHeader,
+} from './vaultui'
+
+const OptionButton = ({ icon, title, text, onClick }) => (
+  <button
+    onClick={onClick}
+    className="group flex w-full items-center gap-4 rounded-2xl border border-[#0E1726]/10 bg-[#F6F8FA] p-4 text-left transition-colors hover:border-[#0E1726]/30 hover:bg-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0E1726]"
+  >
+    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#0E1726] text-[#D4A24C]">
+      <Icon d={icon} className="h-5 w-5" />
+    </span>
+    <span className="flex-1">
+      <span className="block font-medium">{title}</span>
+      <span className="block text-sm text-[#5B6577]">{text}</span>
+    </span>
+  </button>
+)
 
 const Page = () => {
   const router = useRouter();
@@ -14,6 +38,7 @@ const Page = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
   const [customPassword, setCustomPassword] = useState(true);
+  const [toast, setToast] = useState("");
   const email = useSelector((state) => state.session.email);
 
   useEffect(() => {
@@ -21,6 +46,12 @@ const Page = () => {
       router.replace('/Login');
     }
   }, [encryptionKey, router, sessionToken]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   if (!encryptionKey || !sessionToken) return null;
 
@@ -35,112 +66,107 @@ const Page = () => {
     setShowChoice(false);
   };
 
-  const handleSecretSaved = () => {
+  const handleSecretSaved = (message) => {
     handleCloseModal();
     setRefreshKey((key) => key + 1);
+    if (typeof message === "string") setToast(message);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div
+      className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} min-h-screen bg-[#ECEFF3] font-[family-name:var(--font-body)] text-[#0E1726] antialiased`}
+    >
+      <style>{`
+        @keyframes modal-in {
+          from { opacity: 0; transform: translateY(12px) scale(.98); }
+          to   { opacity: 1; transform: none; }
+        }
+        .modal-in { animation: modal-in .25s cubic-bezier(.2,.8,.2,1) both; }
+        @media (prefers-reduced-motion: reduce) { .modal-in { animation: none; } }
+      `}</style>
+
       {/* Header */}
-      <header className="bg-white/5 backdrop-blur-lg border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/50">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Secure Vault</h1>
-                <p className="text-purple-300 text-xs">{email}</p>
-              </div>
+      <header className="sticky top-0 z-30 border-b border-[#0E1726]/10 bg-[#ECEFF3]/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0E1726] text-[#D4A24C]">
+              <Icon d={ICONS.lock} className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="font-[family-name:var(--font-display)] text-lg font-semibold leading-tight tracking-tight">
+                Secure Vault
+              </h1>
+              <p className="truncate text-xs text-[#5B6577]">{email}</p>
             </div>
-            
-            <button 
-              onClick={() => setShowChoice(true)}
-              className="cursor-pointer px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-lg shadow-purple-500/50 transition-all duration-200 hover:scale-105 flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Password
-            </button>
           </div>
+
+          <button
+            onClick={() => setShowChoice(true)}
+            aria-label="Add password"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#0E1726] px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-[#0E1726]/20 transition-colors hover:bg-[#1b2940] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0E1726] sm:px-5"
+          >
+            <Icon d={ICONS.plus} className="h-4 w-4" />
+            <span className="hidden sm:inline">Add password</span>
+            <span className="sm:hidden">Add</span>
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ShowSecret refreshKey={refreshKey} />
+      <main className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
+        <ShowSecret refreshKey={refreshKey} onAdd={() => setShowChoice(true)} />
       </main>
 
       {/* Choice Modal */}
       {showChoice && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={handleCloseModal}>
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Create New Password</h2>
-                <p className="text-purple-200 text-sm">Choose how you'd like to create your password</p>
-              </div>
-              <button onClick={handleCloseModal} className="text-purple-300 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <button 
-                onClick={() => handleChoice(true)}
-                className="cursor-pointer w-full p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/50 rounded-xl transition-all group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-600/30 transition-colors">
-                    <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="text-white font-semibold mb-1 group-hover:text-purple-300 transition-colors">Custom Password</h3>
-                    <p className="text-purple-300 text-sm">Enter your own password manually</p>
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => handleChoice(false)}
-                className="cursor-pointer w-full p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/50 rounded-xl transition-all group"
-              >
-                <div className="flex items-start gap-4 ">
-                  <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-600/30 transition-colors">
-                    <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div className="text-left flex-1 ">
-                    <h3 className="text-white font-semibold mb-1 group-hover:text-purple-300 transition-colors ">Generate Password</h3>
-                    <p className="text-purple-300 text-sm">Create a strong random password</p>
-                  </div>
-                </div>
-              </button>
-            </div>
+        <Modal onClose={handleCloseModal} label="Add a password" maxW="max-w-md">
+          <ModalHeader
+            title="Add a password"
+            subtitle="Choose how to create it."
+            onClose={handleCloseModal}
+          />
+          <div className="space-y-3">
+            <OptionButton
+              icon={ICONS.pen}
+              title="Enter it yourself"
+              text="Save a password you already use"
+              onClick={() => handleChoice(true)}
+            />
+            <OptionButton
+              icon={ICONS.bolt}
+              title="Generate one"
+              text="Create a strong random password"
+              onClick={() => handleChoice(false)}
+            />
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Create/Generate Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={handleCloseModal}>
-          <div className="my-8" onClick={(e) => e.stopPropagation()}>
-            {customPassword
-              ? <CreateSecret onClose={handleCloseModal} onSaved={handleSecretSaved} />
-              : <PasswordGenerate onClose={handleCloseModal} onSaved={handleSecretSaved} />}
-          </div>
-        </div>
+        <Modal
+          onClose={handleCloseModal}
+          label={customPassword ? "Save a password" : "Generate a password"}
+          maxW="max-w-xl"
+        >
+          {customPassword
+            ? <CreateSecret onClose={handleCloseModal} onSaved={handleSecretSaved} />
+            : <PasswordGenerate onClose={handleCloseModal} onSaved={handleSecretSaved} />}
+        </Modal>
       )}
+
+      {/* Toast */}
+      <div
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4"
+      >
+        {toast && (
+          <div className="modal-in flex items-center gap-2.5 rounded-full bg-[#0E1726] px-5 py-3 text-sm font-medium text-white shadow-2xl">
+            <Icon d={ICONS.check} className="h-4 w-4 text-[#D4A24C]" />
+            {toast}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

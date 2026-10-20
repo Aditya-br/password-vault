@@ -1,11 +1,11 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setUser } from "../redux/Session";
 import { usePassword } from "../Context/passwordContext";
 import { hashPassword } from "./auth";
-import { getApiUrl } from "./apiUrl";
+import { fetchApi } from "./apiUrl";
 import { generateKey } from "./generatekey";
 import { CURRENT_KDF_ITERATIONS } from "./cryptoParams";
 import AuthShell, {
@@ -30,9 +30,10 @@ const REQUIREMENTS = [
 const Signup = () => {
   const router = useRouter();
   const dispatch = useDispatch();
-  const { setEncryptionKey, setSessionToken } = usePassword();
+  const { encryptionKey, sessionToken, setEncryptionKey, setSessionToken } = usePassword();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [redirectToHome, setRedirectToHome] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [checks, setChecks] = useState({
     length: false,
@@ -40,6 +41,12 @@ const Signup = () => {
     number: false,
     symbol: false,
   });
+
+  useEffect(() => {
+    if (redirectToHome && encryptionKey && sessionToken) {
+      router.replace("/Home");
+    }
+  }, [encryptionKey, redirectToHome, router, sessionToken]);
 
   const checkPasswordStrength = (password) => {
     let strength = 0;
@@ -73,7 +80,7 @@ const Signup = () => {
         hashPassword(password, authSalt, CURRENT_KDF_ITERATIONS),
         generateKey(password, encSalt, CURRENT_KDF_ITERATIONS),
       ]);
-      const response = await fetch(`${getApiUrl()}signup`, {
+      const response = await fetchApi("signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -84,21 +91,25 @@ const Signup = () => {
           authSalt: Array.from(authSalt),
           encSalt: Array.from(encSalt),
         }),
-      });
+      }, "create your account");
 
       const data = await response.json();
 
       if (response.status === 201) {
+        if (typeof data.token !== "string" || !data.token) {
+          setError("The backend is outdated and returned an incomplete signup response. Deploy the latest backend before trying again. This email may already have been registered by the old backend.");
+          return;
+        }
         dispatch(setUser({ email: email }));
         setEncryptionKey(encryptionKey);
         setSessionToken(data.token);
-        router.push("/Home");
+        setRedirectToHome(true);
       } else {
         setError(data.error || "Signup failed");
       }
     } catch (err) {
       console.error("Signup error:", err);
-      setError("Server error — please try again later.");
+      setError(err instanceof Error ? err.message : "Server error — please try again later.");
     } finally {
       setLoading(false);
     }
