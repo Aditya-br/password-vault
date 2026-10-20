@@ -3,6 +3,8 @@ const LoginDetailsSchema = new mongoose.Schema({
     emailid: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
     authSalt: { type: [Number], required: true },
-    encSalt: { type: [Number], required: true }
+    encSalt: { type: [Number], required: true },
+    authIterations: { type: Number, default: 100000 },
+    encIterations: { type: Number, default: 100000 }
 });
 export const LoginDetails = mongoose.model('LoginDetails', LoginDetailsSchema);

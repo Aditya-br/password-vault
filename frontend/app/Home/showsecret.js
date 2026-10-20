@@ -1,32 +1,29 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
 import { decryptText } from '../utilities/decoder'
 import { usePassword } from '../Context/passwordContext'
-import { generateKey } from '../utilities/generatekey'
+import { getApiUrl } from '../utilities/apiUrl'
 
-const ShowSecret = () => {
+const ShowSecret = ({ refreshKey = 0 }) => {
     const [secrets, setSecrets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [copiedLabel, setCopiedLabel] = useState(null);
-    const { masterPassword } = usePassword();
-    const email = useSelector((state) => state.session.email);
+    const { encryptionKey, sessionToken } = usePassword();
 
     useEffect(() => {
         fetchSecrets();
-    }, []);
+    }, [refreshKey]);
 
     const fetchSecrets = async () => {
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}showsecret`, {
+            const response = await fetch(`${getApiUrl()}showsecret`, {
                 method:'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`,
                 },
-                body: JSON.stringify({
-                    emailid: email,
-                })
+                body: JSON.stringify({})
             });
             if (response.status === 200) {
                 const data = await response.json();
@@ -56,18 +53,17 @@ const ShowSecret = () => {
 
     const handleCopy = async (label) => {
         try {
-            const response = await fetch(`https://password-vault-ylej.onrender.com/getsecret`, {
+            const response = await fetch(`${getApiUrl()}getsecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${masterPassword}`
+                    'Authorization': `Bearer ${sessionToken}`,
                 },
-                body: JSON.stringify({ emailid: email, label: label })
+                body: JSON.stringify({ label: label })
             });
             if (response.status === 200) {
                 const data = await response.json();
-                const key = await generateKey(masterPassword, new Uint8Array(data.salt));
-                const pass = await decryptText(data.encodedPassword, key);
+                const pass = await decryptText(data.encodedPassword, encryptionKey);
                 await navigator.clipboard.writeText(pass);
                 setCopiedLabel(label);
                 setTimeout(() => setCopiedLabel(null), 2000);
@@ -85,12 +81,13 @@ const ShowSecret = () => {
         if (!confirm(`Are you sure you want to delete "${label}"?`)) return;
 
         try {
-            const response = await fetch(`https://password-vault-ylej.onrender.com/removesecret`, {
+            const response = await fetch(`${getApiUrl()}removesecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`,
                 },
-                body: JSON.stringify({ emailid: email, label: label })
+                body: JSON.stringify({ label: label })
             });
             if (response.status === 200) {
                 // Refresh the secrets list after deletion

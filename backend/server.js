@@ -2,15 +2,17 @@ import express from 'express'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
 import cors from 'cors'
-import { generateKey, encryptText } from './pass-encdec.js'
-import { hashPassword } from './hash.js'
 import { LoginDetails } from './models/logindetails.js'
 import { Secrets } from './models/secrets.js'
-import { webcrypto } from "crypto";
+import { timingSafeEqual, webcrypto } from "crypto";
 const crypto = webcrypto;
 dotenv.config()
 const app = express()
 const port = process.env.PORT || 5000
+const CURRENT_KDF_ITERATIONS = 600000;
+const LEGACY_KDF_ITERATIONS = 100000;
+const loginChallenges = new Map();
+const authenticatedSessions = new Map();
 app.use(cors())
 app.use(express.json());
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -25,10 +27,73 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })
 
-app.post('/removesecret', async (req, res) => {
+function createSession(emailid) {
+  const now = Date.now();
+  for (const [token, session] of authenticatedSessions) {
+    if (session.expiresAt <= now) authenticatedSessions.delete(token);
+  }
+  const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+  authenticatedSessions.set(token, {
+    emailid,
+    expiresAt: now + 60 * 60 * 1000
+  });
+  return token;
+}
+
+function requireAuth(req, res, next) {
+  const authorization = req.get('Authorization') || '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  const session = authenticatedSessions.get(token);
+  if (!session || session.expiresAt <= Date.now()) {
+    authenticatedSessions.delete(token);
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  req.authEmail = session.emailid;
+  next();
+}
+
+app.post('/auth-challenge', async (req, res) => {
   try {
-    const { emailid, label } = req.body;
-    const result = await Secrets.deleteOne({ emailid, Label: label });
+    const { emailid } = req.body;
+    if (typeof emailid !== 'string' || !emailid.trim()) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await LoginDetails.findOne({ emailid });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const challengeId = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+    const nonce = crypto.getRandomValues(new Uint8Array(32));
+    const now = Date.now();
+    for (const [id, challenge] of loginChallenges) {
+      if (challenge.expiresAt <= now) loginChallenges.delete(id);
+    }
+    loginChallenges.set(challengeId, {
+      emailid,
+      nonce: Buffer.from(nonce).toString('base64'),
+      expiresAt: now + 2 * 60 * 1000
+    });
+
+    res.status(200).json({
+      challengeId,
+      nonce: Buffer.from(nonce).toString('base64'),
+      authSalt: user.authSalt,
+      encSalt: user.encSalt,
+      authIterations: user.authIterations || LEGACY_KDF_ITERATIONS,
+      encIterations: user.encIterations || LEGACY_KDF_ITERATIONS
+    });
+  } catch (error) {
+    console.error('Error creating login challenge:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/removesecret', requireAuth, async (req, res) => {
+  try {
+    const { label } = req.body;
+    const result = await Secrets.deleteOne({ emailid: req.authEmail, Label: label });
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Secret not found' });
     }
@@ -40,10 +105,9 @@ app.post('/removesecret', async (req, res) => {
 });
 
 
-app.post('/showsecret', async (req, res) => {
+app.post('/showsecret', requireAuth, async (req, res) => {
   try {
-    const { emailid } = req.body;
-    const secret = await Secrets.find({ emailid });
+    const secret = await Secrets.find({ emailid: req.authEmail });
     if (!secret) {
       return res.status(404).json({ error: 'Secret not found' });
     }
@@ -54,11 +118,10 @@ app.post('/showsecret', async (req, res) => {
   }
 });
 
-app.post('/getsecret', async (req, res) => {
+app.post('/getsecret', requireAuth, async (req, res) => {
   try {
-    const { emailid, label } = req.body;
-    const salt = await LoginDetails.findOne({ emailid }, { encSalt: 1, _id: 0 });
-    const secret = await Secrets.findOne({ emailid: emailid, Label: label });
+    const { label } = req.body;
+    const secret = await Secrets.findOne({ emailid: req.authEmail, Label: label });
 
     if (!secret) {
       return res.status(404).json({ error: 'Secret not found' });
@@ -71,8 +134,7 @@ app.post('/getsecret', async (req, res) => {
         : secret.encodedPassword;
 
     res.status(200).json({
-      encodedPassword: parsedPassword,
-      salt: salt.encSalt
+      encodedPassword: parsedPassword
     });
   } catch (error) {
     console.error("Error retrieving secret:", error);
@@ -81,126 +143,167 @@ app.post('/getsecret', async (req, res) => {
 });
 
 
-const generatePassword = (length, useUppercase, useLowercase, useNumbers, useSpecial, useLookAlikes) => {
-  const uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
-  const numberChars = '0123456789';
-  const specialChars = '!@#$%^&*()-_=+[]{}|;:,.<>?';
-  let pass = "";
-  let arr = []
-  if (useUppercase) arr.push(uppercaseChars);
-  if (useLowercase) arr.push(lowercaseChars);
-  if (useNumbers) arr.push(numberChars);
-  if (useSpecial) arr.push(specialChars);
-  while (pass.length < length) {
-    const idx = Math.floor(Math.random() * 4);
-    const len = arr[idx].length;
-    const element = Math.floor(Math.random() * len);
-    pass += arr[idx][element];
-  }
-  return pass
-}
-app.post('/generatepassword', async (req, res) => {
+app.post('/generatepassword', requireAuth, async (req, res) => {
   try {
-    const { emailid, masterPassword, label, length, useUppercase, useLowercase, useNumbers, useSpecial, useLookAlikes,username,url,note } = req.body;
-    let password = generatePassword(length, useUppercase, useLowercase, useNumbers, useSpecial, useLookAlikes);
-    const stored = await Secrets.find({ emailid }, { encodedPassword: 1, _id: 0 });
-    const user = await LoginDetails.findOne({ emailid });
-    const salt = new Uint8Array(user.encSalt);
-    const { key } = await generateKey(masterPassword, salt);
-    while (encryptText(password, key) in stored) {
-      password = generatePassword(length, useUppercase, useLowercase, useNumbers, useSpecial, useLookAlikes);
+    const { label, username, url, note, encodedPassword } = req.body;
+    if (!isValidSecretFields(req.authEmail, label, username, url) || !isValidEncryptedPassword(encodedPassword)) {
+      return res.status(400).json({ error: 'Encrypted password is invalid' });
     }
-    const encryptedPassword = await encryptText(password, key);
     const newSecret = new Secrets({
-      emailid,
+      emailid: req.authEmail,
       Label: label,
       Username: username,
       URL: url,
       Note: note || "",
-      encodedPassword: JSON.stringify(encryptedPassword)
+      encodedPassword: JSON.stringify(encodedPassword)
     });
 
     await newSecret.save();
-    res.status(201).json({ message: 'Secret created successfully', password });
+    res.status(201).json({ message: 'Secret created successfully' });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Secret already present' });
+    }
     console.error('Error creating secret:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/createsecret', async (req, res) => {
+app.post('/createsecret', requireAuth, async (req, res) => {
   try {
-    const { emailid, label, password, masterPassword, note, username, url } = req.body;
-    const user = await LoginDetails.findOne({ emailid });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    const { label, encodedPassword, note, username, url } = req.body;
+    if (!isValidSecretFields(req.authEmail, label, username, url) || !isValidEncryptedPassword(encodedPassword)) {
+      return res.status(400).json({ error: 'Encrypted password is invalid' });
     }
-    const rec = await Secrets.findOne({ emailid, label });
+    const rec = await Secrets.findOne({ emailid: req.authEmail, Label: label });
     if (rec) {
-      return res.status(401).json({ error: 'Secret already present' });
+      return res.status(409).json({ error: 'Secret already present' });
     }
-    const salt = new Uint8Array(user.encSalt);
-    const { key } = await generateKey(masterPassword, salt);
-    const encryptedPassword = await encryptText(password, key);
     const newSecret = new Secrets({
-      emailid,
+      emailid: req.authEmail,
       Label: label,
       Username: username,
       URL: url,
       Note: note,
-      encodedPassword: JSON.stringify(encryptedPassword)
+      encodedPassword: JSON.stringify(encodedPassword)
     });
     await newSecret.save();
     res.status(201).json({ message: 'Secret created successfully' });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Secret already present' });
+    }
     console.error('Error creating secret:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/signup', (req, res) => {
-  const { emailid, password } = req.body
-  const loginsalt = crypto.getRandomValues(new Uint8Array(16));
-  const encsalt = crypto.getRandomValues(new Uint8Array(16));
-  LoginDetails.findOne({ emailid }).then(user => {
-    if (user) {
+function isValidEncryptedPassword(cipher) {
+  return cipher !== null &&
+    typeof cipher === 'object' &&
+    Array.isArray(cipher.iv) &&
+    cipher.iv.length === 12 &&
+    cipher.iv.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255) &&
+    typeof cipher.data === 'string' &&
+    cipher.data.length <= 1024 &&
+    cipher.data.length > 0;
+}
+
+function isValidSecretFields(emailid, label, username, url) {
+  return typeof emailid === 'string' &&
+    emailid.length > 0 &&
+    typeof label === 'string' &&
+    label.trim().length > 0 &&
+    typeof username === 'string' &&
+    typeof url === 'string';
+}
+
+app.post('/signup', async (req, res) => {
+  try {
+    const { emailid, passwordHash, authSalt, encSalt, authIterations, encIterations } = req.body;
+    if (
+      typeof emailid !== 'string' ||
+      !emailid.trim() ||
+      typeof passwordHash !== 'string' ||
+      !/^[A-Za-z0-9+/]{43}=$/.test(passwordHash) ||
+      authIterations !== CURRENT_KDF_ITERATIONS ||
+      encIterations !== CURRENT_KDF_ITERATIONS ||
+      !Array.isArray(authSalt) ||
+      authSalt.length !== 16 ||
+      !authSalt.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255) ||
+      !Array.isArray(encSalt) ||
+      encSalt.length !== 16 ||
+      !encSalt.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+    ) {
+      return res.status(400).json({ error: 'Signup details are invalid' });
+    }
+
+    const newUser = new LoginDetails({
+      emailid: emailid.trim(),
+      passwordHash,
+      authSalt,
+      encSalt,
+      authIterations,
+      encIterations
+    });
+    await newUser.save();
+    res.status(201).json({
+      message: 'User created successfully',
+      token: createSession(newUser.emailid)
+    });
+  } catch (error) {
+    if (error.code === 11000) {
       return res.status(409).json({ error: 'User already exists' });
     }
-  });
-  hashPassword(password, loginsalt).then(hash => {
-    const newUser = new LoginDetails({
-      emailid: emailid,
-      passwordHash: hash,
-      authSalt: Array.from(loginsalt),
-      encSalt: Array.from(encsalt)
-    });
-    newUser.save().then(() => {
-      res.status(201).json({ message: 'User created successfully' });
-    }).catch(err => {
-      console.error('Error creating user:', err);
-      res.status(500).json({ error: 'Internal server error' });
-    });
-  });
-})
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-app.post('/login', (req, res) => {
-  const { emailid, password } = req.body
-  LoginDetails.findOne({ emailid }).then(user => {
+app.post('/login', async (req, res) => {
+  try {
+    const { emailid, challengeId, proof } = req.body;
+    const challenge = loginChallenges.get(challengeId);
+    loginChallenges.delete(challengeId);
+    if (!challenge || challenge.emailid !== emailid || challenge.expiresAt <= Date.now()) {
+      return res.status(401).json({ error: 'Invalid or expired login challenge' });
+    }
+
+    const user = await LoginDetails.findOne({ emailid });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    hashPassword(password, new Uint8Array(user.authSalt)).then(hash => {
-      if (hash !== user.passwordHash) {
-        return res.status(401).json({ error: 'Invalid password' });
-      }
-      res.status(200).json({ message: 'Login successful' });
+
+    const verifier = Buffer.from(user.passwordHash, 'base64');
+    const suppliedProof = Buffer.from(typeof proof === 'string' ? proof : '', 'base64');
+    const hmacKey = await crypto.subtle.importKey(
+      'raw',
+      verifier,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const expectedProof = Buffer.from(await crypto.subtle.sign(
+      'HMAC',
+      hmacKey,
+      Buffer.from(challenge.nonce, 'base64')
+    ));
+    if (suppliedProof.length !== expectedProof.length || !timingSafeEqual(suppliedProof, expectedProof)) {
+      return res.status(401).json({ error: 'Invalid password' });
+    }
+    res.status(200).json({
+      message: 'Login successful',
+      token: createSession(user.emailid)
     });
-  }).catch(err => {
+  } catch (err) {
     console.error('Error logging in:', err);
     res.status(500).json({ error: 'Internal server error' });
-  });
+  }
 })
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
 
 app.listen(port, async () => {
   console.log(`Example app listening on port ${port}`)

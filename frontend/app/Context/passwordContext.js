@@ -4,9 +4,15 @@ import { createContext, useContext, useState } from "react";
 const PasswordContext = createContext();
 
 export const PasswordProvider = ({ children }) => {
-  const [masterPassword, setMasterPassword] = useState("");
+  const [encryptionKey, setEncryptionKey] = useState(null);
+  const [sessionToken, setSessionToken] = useState(null);
   return (
-    <PasswordContext.Provider value={{ masterPassword, setMasterPassword }}>
+    <PasswordContext.Provider value={{
+      encryptionKey,
+      setEncryptionKey,
+      sessionToken,
+      setSessionToken
+    }}>
       {children}
     </PasswordContext.Provider>
   );

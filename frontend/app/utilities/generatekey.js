@@ -1,4 +1,4 @@
-export async function generateKey(password,salt) {
+export async function generateKey(password,salt,iterations = 100000) {
   const enc = new TextEncoder().encode(password);
   const keyMaterial = await crypto.subtle.importKey(
     "raw", 
@@ -11,7 +11,7 @@ export async function generateKey(password,salt) {
     {
       name: "PBKDF2",
       salt,
-      iterations: 100000,                           // number of hashing rounds
+      iterations,                                   // number of hashing rounds
       hash: "SHA-256",                              // hash algorithm used
     },
     keyMaterial,

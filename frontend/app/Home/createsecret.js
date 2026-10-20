@@ -1,11 +1,11 @@
 "use client"
 import React, { useState } from 'react'
 import { usePassword } from '../Context/passwordContext'
-import { useSelector } from 'react-redux'
+import { encryptText } from '../utilities/encoder'
+import { getApiUrl } from '../utilities/apiUrl'
 
-const CreateSecret = ({ onClose }) => {
-    const { masterPassword } = usePassword();
-    const email = useSelector((state) => state.session.email);
+const CreateSecret = ({ onClose, onSaved }) => {
+    const { encryptionKey, sessionToken } = usePassword();
     const [label, setLabel] = useState("");
     const [username, setUsername] = useState("");
     const [url, setUrl] = useState("");
@@ -19,17 +19,19 @@ const CreateSecret = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}createsecret`, {
+            if (!encryptionKey || !sessionToken) {
+                throw new Error('Please sign in again to unlock the vault');
+            }
+            const encodedPassword = await encryptText(password, encryptionKey);
+            const response = await fetch(`${getApiUrl()}createsecret`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${masterPassword}`
+                    'Authorization': `Bearer ${sessionToken}`,
                 },
                 body: JSON.stringify({
-                    emailid: email,
                     label: label,
-                    password: password,
-                    masterPassword: masterPassword,
+                    encodedPassword,
                     note: note,
                     username: username,
                     url: url
@@ -42,16 +44,16 @@ const CreateSecret = ({ onClose }) => {
                 setUsername("");
                 setUrl("");
                 setNote("");
-                if (onClose) onClose();
+                if (onSaved) onSaved();
+                else if (onClose) onClose();
                 alert('Password saved successfully!');
-                window.location.reload();
             } else {
                 const data = await response.json();
                 setError(data.error || 'Failed to create password');
             }
         } catch (error) {
             console.error('Error creating secret:', error);
-            setError('Server error. Please try again.');
+            setError(error instanceof Error ? error.message : 'Server error. Please try again.');
         } finally {
             setLoading(false);
         }

@@ -43,3 +43,15 @@ export async function encryptText(plain, key) {
   };
 }
 
+// Decrypt text encrypted by encryptText
+export async function decryptText(cipher, key) {
+  const iv = new Uint8Array(cipher.iv);
+  const data = Uint8Array.from(atob(cipher.data), character => character.charCodeAt(0));
+  const plain = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    data
+  );
+
+  return new TextDecoder().decode(plain);
+}

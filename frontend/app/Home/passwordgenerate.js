@@ -1,11 +1,12 @@
 "use client"
 import React, { useState } from 'react'
 import { usePassword } from '../Context/passwordContext';
-import { useSelector } from 'react-redux';
+import { encryptText } from '../utilities/encoder'
+import { generatePassword } from '../utilities/passwordgenerator'
+import { getApiUrl } from '../utilities/apiUrl'
 
-const PasswordGenerate = ({ onClose }) => {
-    const { masterPassword } = usePassword();
-    const email = useSelector((state) => state.session.email);
+const PasswordGenerate = ({ onClose, onSaved }) => {
+    const { encryptionKey, sessionToken } = usePassword();
     const [label, setLabel] = useState("");
     const [length, setLength] = useState(16);
     const [username, setUsername] = useState("");
@@ -28,39 +29,44 @@ const PasswordGenerate = ({ onClose }) => {
         setLoading(true);
         setError("");
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}generatepassword`, {
+            if (!encryptionKey || !sessionToken) {
+                throw new Error('Please sign in again to unlock the vault');
+            }
+            const password = generatePassword(parseInt(length, 10), {
+                useUppercase,
+                useLowercase,
+                useNumbers,
+                useSpecial: useSpecialCharacters,
+                useLookAlikes
+            });
+            const encodedPassword = await encryptText(password, encryptionKey);
+            const response = await fetch(`${getApiUrl()}generatepassword`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionToken}`,
                 },
                 body: JSON.stringify({
-                    emailid: email,
-                    masterPassword: masterPassword,
                     label: label,
                     username: username,
                     url: url,
                     note: note,
-                    length: parseInt(length),
-                    useUppercase: useUppercase,
-                    useLowercase: useLowercase,
-                    useNumbers: useNumbers,
-                    useSpecial: useSpecialCharacters,
-                    useLookAlikes: useLookAlikes,
+                    encodedPassword,
                 })
             });
             if (response.status === 201) {
                 const data = await response.json();
                 setLabel("");
-                if (onClose) onClose();
+                if (onSaved) onSaved();
+                else if (onClose) onClose();
                 alert('Password generated and saved!');
-                window.location.reload();
             } else {
                 const data = await response.json();
                 setError(data.error || 'Failed to generate password');
             }
         } catch (error) {
             console.error('Error creating secret:', error);
-            setError('Server error. Please reload try again.');
+            setError(error instanceof Error ? error.message : 'Server error. Please try again.');
         } finally {
             setLoading(false);
         }

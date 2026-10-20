@@ -1,15 +1,28 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
+import { useRouter } from 'next/navigation'
+import { usePassword } from '../Context/passwordContext'
 import CreateSecret from './createsecret'
 import PasswordGenerate from './passwordgenerate'
 import ShowSecret from './showsecret'
 
 const Page = () => {
+  const router = useRouter();
+  const { encryptionKey, sessionToken } = usePassword();
+  const [refreshKey, setRefreshKey] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
   const [customPassword, setCustomPassword] = useState(true);
   const email = useSelector((state) => state.session.email);
+
+  useEffect(() => {
+    if (!encryptionKey || !sessionToken) {
+      router.replace('/Login');
+    }
+  }, [encryptionKey, router, sessionToken]);
+
+  if (!encryptionKey || !sessionToken) return null;
 
   const handleChoice = (isCustom) => {
     setCustomPassword(isCustom);
@@ -20,6 +33,11 @@ const Page = () => {
   const handleCloseModal = () => {
     setShowCreate(false);
     setShowChoice(false);
+  };
+
+  const handleSecretSaved = () => {
+    handleCloseModal();
+    setRefreshKey((key) => key + 1);
   };
 
   return (
@@ -55,7 +73,7 @@ const Page = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ShowSecret />
+        <ShowSecret refreshKey={refreshKey} />
       </main>
 
       {/* Choice Modal */}
@@ -117,7 +135,9 @@ const Page = () => {
       {showCreate && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={handleCloseModal}>
           <div className="my-8" onClick={(e) => e.stopPropagation()}>
-            {customPassword ? <CreateSecret onClose={handleCloseModal} /> : <PasswordGenerate onClose={handleCloseModal} />}
+            {customPassword
+              ? <CreateSecret onClose={handleCloseModal} onSaved={handleSecretSaved} />
+              : <PasswordGenerate onClose={handleCloseModal} onSaved={handleSecretSaved} />}
           </div>
         </div>
       )}
